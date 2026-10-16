@@ -70,4 +70,4 @@
 
 ## 许可
 
-MIT（见 `LICENSE`）。欢迎通过 GitHub Issue 反馈 bug 与建议。
+MIT-0（No Attribution，见 `LICENSE`）。欢迎通过 GitHub Issue 反馈 bug 与建议。

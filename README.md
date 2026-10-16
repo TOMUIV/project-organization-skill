@@ -61,12 +61,14 @@
 
 ## 开源与发布
 
-本技能包**完全开源**：
+本技能包**完全开源**；**最新版以下面两处为准**：
 
-- **源码仓库**：https://github.com/TOMUIV/project-organization-skill —— 可查看完整代码、Fork、提 Issue。
-- **技能市场（ClawHub）**：`project-organization`
-  - 安装：`clawhub install project-organization`
-  - 或对 OpenClaw 说「安装大项目组织技能包」
+| 渠道 | 地址 | 查看 / 获取 |
+|---|---|---|
+| **GitHub**（源码） | **https://github.com/TOMUIV/project-organization-skill** | 看完整代码、Fork、提 Issue、跟版本 |
+| **ClawHub**（技能市场） | slug **`project-organization`** | `clawhub install project-organization`（或搜索 `project-organization`）|
+
+> 想确认「最新版是多少 / 改了什么」——去上面任一渠道看即可；本仓库与 ClawHub 同源同版本。
 
 ## 许可
 

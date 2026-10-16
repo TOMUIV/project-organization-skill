@@ -10,7 +10,7 @@ description: >
   读取 buffer、处理 buffer、缓冲区、把文件丢进 buffer、buffer 归位。
   Use ONLY for long-lived / multi-phase projects；一次性临时任务走 `temp-workspace`，不要用本 skill。
   所有大项目根**必须配备 git**（`scripts/git_setup.py`；改动前先 commit）。
-version: 2.5.1
+version: 2.5.2
 ---
 
 # Project Organization — 大项目组织方法论
@@ -219,35 +219,35 @@ projects/<项目>/
 
 ## 五、快速开始
 
-```powershell
-$PO = "$env:USERPROFILE\.config\opencode\skills\project-organization\scripts"
+```bash
+PO="$HOME/.config/opencode/skills/project-organization/scripts"
 
 # 0) ★ 版本控制（每个大项目根必备；new_big_project 会自动建库，老项目补做）
-python "$PO\git_setup.py" init --root .                      # git init + .gitignore + 首次提交
-python "$PO\git_setup.py" commit -m "改前打点：<说明>"         # 每次改动前/后各 commit 一次
-python "$PO\git_setup.py" status                             # 看是否脏 / 分支 / HEAD
+python "$PO/git_setup.py" init --root .                      # git init + .gitignore + 首次提交
+python "$PO/git_setup.py" commit -m "改前打点：<说明>"         # 每次改动前/后各 commit 一次
+python "$PO/git_setup.py" status                             # 看是否脏 / 分支 / HEAD
 
 # 1) 建大项目根（自动含 git init + 首次提交）
-python "$PO\new_big_project.py" --name "my-research" --kind thu
+python "$PO/new_big_project.py" --name "my-research" --kind thu
 
 # 2) 进大项目后建子项目（自动向上查找 .bigproject.json 定位根）
-python "$PO\new_subproject.py" --name analysis --description "结果分析"
+python "$PO/new_subproject.py" --name analysis --description "结果分析"
 
 # 2.5) 缓冲区（扁平）：用户把文件丢进 buffer/ 后，AI 读 buffer 并归位
-python "$PO\buffer.py" init --root .                 # 建缓冲区（幂等；new_big_project 已自带）
-python "$PO\buffer.py" list                          # 列 buffer/（自动 TTL 检查）→ 出归属方案 → 用户确认
-python "$PO\buffer.py" take --item 数据.csv --subproject analysis --subdir data --apply
-python "$PO\buffer.py" deliver --file output/报告.pdf --apply   # ★ AI 交付 → buffer/
+python "$PO/buffer.py" init --root .                 # 建缓冲区（幂等；new_big_project 已自带）
+python "$PO/buffer.py" list                          # 列 buffer/（自动 TTL 检查）→ 出归属方案 → 用户确认
+python "$PO/buffer.py" take --item 数据.csv --subproject analysis --subdir data --apply
+python "$PO/buffer.py" deliver --file output/报告.pdf --apply   # ★ AI 交付 → buffer/
 
 # 3) 结构自检
-python "$PO\audit_project.py" --root "<大项目根>"
+python "$PO/audit_project.py" --root "<大项目根>"
 
 # 4) 归整时"删除"旧目录 → 软删除进 .trash（默认只预演）
-python "$PO\trash.py" put "<旧目录>" --reason "迁移到 projects/xxx" 
-python "$PO\trash.py" put "<旧目录>" --reason "迁移到 projects/xxx" --apply
+python "$PO/trash.py" put "<旧目录>" --reason "迁移到 projects/xxx" 
+python "$PO/trash.py" put "<旧目录>" --reason "迁移到 projects/xxx" --apply
 
 # 5) 看操作日志（谁在何时创建/删除/归档了什么）
-python "$PO\journal.py" --tail 20
+python "$PO/journal.py" --tail 20
 ```
 
 > 所有脚本均**先预演、后执行**（默认 dry-run，需 `--apply` 才落盘/移动）；输出 stdout 为 JSON。
@@ -499,24 +499,24 @@ Syncthing 的文件夹**版本功能又没开**、回收站为空 → **改动�
 **有 git，就一条命令 `git checkout -- <file>` 找回。**
 
 ### 怎么做
-```powershell
-$PO = "$env:USERPROFILE\.config\opencode\skills\project-organization\scripts"
+```bash
+PO="$HOME/.config/opencode/skills/project-organization/scripts"
 
 # 建库（幂等）：git init + 写 .gitignore + 首次提交
-python "$PO\git_setup.py" init --root "<大项目根>"
+python "$PO/git_setup.py" init --root "<大项目根>"
 
 # ★ 纪律：改动前先打点（人/AI 手动操作之前都先跑一次）
-python "$PO\git_setup.py" commit -m "改前打点：<说明>"
+python "$PO/git_setup.py" commit -m "改前打点：<说明>"
 
 # ★★ 覆盖 / 重跑生成器 / 批量替换之前 —— 一条命令打点 + 打标签（安全绳）
-python "$PO\git_setup.py" snapshot -m "重跑生成器前" --tag pre-run-<时间戳>
+python "$PO/git_setup.py" snapshot -m "重跑生成器前" --tag pre-run-<时间戳>
 
 # 版本 / 确认 / 冻结打点
-python "$PO\git_setup.py" tag v3-答辩 -m "第三版（用户已确认封面）"
+python "$PO/git_setup.py" tag v3-答辩 -m "第三版（用户已确认封面）"
 
 # 看状态 / 历史
-python "$PO\git_setup.py" status
-python "$PO\git_setup.py" log -n 20
+python "$PO/git_setup.py" status
+python "$PO/git_setup.py" log -n 20
 ```
 
 > 配套：`deck-authoring` skill 也有同语义的 snapshot（供「人+AI 共创交付物」流程独立调用）。
@@ -597,3 +597,14 @@ print(json.dumps({"status": "ok", "total": len(items), "done": len(done) + len(t
 
 > 与 `AGENTS.md`「脚本设计铁律」互补：那条讲"非阻塞 / 参数化 / JSON / stderr"；
 > 本条补"**长了怎么不死、怎么看得见**"。二者一起才算合格的长任务脚本。
+
+---
+
+## 最新版
+
+本技能**开源**，**最新版以这两处为准**：
+
+- **GitHub**：https://github.com/TOMUIV/project-organization-skill
+- **ClawHub**：`project-organization`（`clawhub install project-organization`）
+
+> 版本对不上、想看改了什么 → 去上面任一渠道查。

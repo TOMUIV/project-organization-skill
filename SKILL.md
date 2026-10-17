@@ -10,7 +10,7 @@ description: >
   读取 buffer、处理 buffer、缓冲区、把文件丢进 buffer、buffer 归位。
   Use ONLY for long-lived / multi-phase projects；一次性临时任务走 `temp-workspace`，不要用本 skill。
   所有大项目根**必须配备 git**（`scripts/git_setup.py`；改动前先 commit）。
-version: 2.6.2
+version: 2.6.3
 ---
 
 # Project Organization — 大项目组织方法论

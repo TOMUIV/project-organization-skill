@@ -96,23 +96,31 @@ def auto_purge(root, is_big, days, hard, enabled=True, dry_run=False, quiet=Fals
     if not enabled:
         return []
     cutoff = time.time() - days * SECONDS_PER_DAY
-    expired = [c for c in buffer_items(root) if c.stat().st_mtime < cutoff]
+    expired = []
+    for c in buffer_items(root):
+        try:                                   # 并发下文件可能已消失 → 跳过，不崩
+            st = c.stat()
+        except OSError:
+            continue
+        if st.st_mtime < cutoff:
+            expired.append((c, round((time.time() - st.st_mtime) / SECONDS_PER_DAY, 2)))
     purged = []
-    for c in expired:
+    for c, age in expired:
         if dry_run:
-            purged.append({"item": c.name, "age_days": round((time.time() - c.stat().st_mtime) / SECONDS_PER_DAY, 2),
-                           "trashed": None})
+            purged.append({"item": c.name, "age_days": age, "trashed": None})
             continue
         if hard:
             if c.is_dir():
-                shutil.rmtree(c)
+                shutil.rmtree(c, ignore_errors=True)
             else:
-                c.unlink()
+                try:
+                    c.unlink()
+                except OSError:
+                    pass
             dest = None
         else:
             dest = C.soft_remove(root, is_big, c, reason="buffer TTL 超期(%d天)" % days)
-        purged.append({"item": c.name,
-                       "age_days": round((time.time() - c.stat().st_mtime) / SECONDS_PER_DAY, 2),
+        purged.append({"item": c.name, "age_days": age,
                        "trashed": str(dest) if dest else None})
         C.project_log(root, is_big, "buffer.purge", target=c,
                       days=days, hard=hard, trashed=str(dest) if dest else None)

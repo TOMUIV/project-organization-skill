@@ -10,7 +10,7 @@ description: >
   读取 buffer、处理 buffer、缓冲区、把文件丢进 buffer、buffer 归位。
   Use ONLY for long-lived / multi-phase projects；一次性临时任务走 `temp-workspace`，不要用本 skill。
   所有大项目根**必须配备 git**（`scripts/git_setup.py`；改动前先 commit）。
-version: 2.5.2
+version: 2.6.0
 ---
 
 # Project Organization — 大项目组织方法论
@@ -209,10 +209,11 @@ projects/<项目>/
 **「读取 buffer」= 4 步**：① `buffer.py list`（进入前**自动 TTL 检查**）→ ② **语义归属判断**（§四）→
 ③ **出「归属方案」（源→目标）→ 等用户确认** → ④ 执行：`take`（归位）/ `deliver`（AI 交付）/ `new_subproject.py`（新建）；`take/deliver/discard` 自动写 journal。
 
-**规则（就 4 条）**
+**规则（就 5 条）**
 - ★★ **TTL 2 天 = 强制清理**：进入 buffer（任何子命令）**先自动检查**，**超期一律清掉**（软删进 `.trash/`，可恢复；`--hard` 真删，`--no-purge` 跳过）；`audit` 报 `buffer_expired`。**buffer 只做中转，不是存储区。**
 - ★★ **一一对应**：**buffer 里的每一项都必须在 `projects/`（或 `shared/`/`archive/`）有归宿**——要么等 `take` 归位，要么是项目 `output/` 的**交付副本**（`deliver` **默认 copy → 项目保留原件**）；**禁止把 buffer 当唯一副本 / 长期存放**。
 - **先预演后执行**（`--apply`）；覆盖同名旧物**进暂存**（`.trash/` 或 `buffer/.replaced/`），**不硬删**。
+- ★★ **只留最新一版（禁版本堆积）**：**同一交付物的新一轮交付 = 取代旧版**——`deliver` **默认自动**把同族旧版（如 `x_v3.png` 之于 `x_v5.png`）**软删进 `.trash/`**（`--no-supersede` 可关）；**禁止 `v1/v2/v3…` 堆在 buffer**。存量用 `buffer.py tidy --apply` 一把收拢；`audit` 报 `buffer_version_pileup`。
 - ⭐ **任务文件归位**（AGENTS 规则 8）：用户丢来的输入 + 本任务的中间/结果件，**收尾必须归进对应子项目**；同名不覆盖（`name.1.ext`）；**`take` 归位后才算完**。
 
 ---
@@ -391,16 +392,17 @@ python scripts/trash.py purge --older-than 30 --confirm                  # 唯�
 输出：`{"status":"ok","root":...,"project":...,"created":[...],"type":...,"gitignore_rule":...}`
 
 ### `scripts/buffer.py`
-用途：人类 ⇄ AI 交换缓冲区（`<大项目根>/buffer/`，**扁平 · 2 天 TTL**）——`init` / `list` / `take` / `deliver` / `add` / `purge` / `discard`。
+用途：人类 ⇄ AI 交换缓冲区（`<大项目根>/buffer/`，**扁平 · 2 天 TTL**）——`init` / `list` / `take` / `deliver` / `add` / `purge` / `discard` / **`tidy`**。
 | 子命令 | 关键参数 | 说明 |
 |--------|----------|------|
 | `init` | `--root` `--force` | 建缓冲区骨架 + README；**幂等、直接落盘**（纯新增） |
 | `list` | `--root` `--days` `--hard` `--no-purge` | 列 `buffer/`（**进入前自动 TTL 检查**） |
 | `take` | `--item NAME...` `--dest DIR` \| `--subproject NAME [--subdir SUB]` `--mkdir` `--overwrite` `--reason` `--apply` `--days` `--hard` | 把 buffer 项移动到目标目录；**默认预演** |
-| `deliver` | `--file FILE` `--name` `--move` `--overwrite` `--apply` | ★ AI 把交付物放进 `buffer/`（默认复制；交付优先放这里） |
+| `deliver` | `--file FILE` `--name` `--move` `--overwrite` **`--no-supersede`** `--apply` | ★ AI 把交付物放进 `buffer/`（默认复制）；**默认自动把同族旧版软删进 `.trash/`（只留最新一版）** |
 | `add` | `--file FILE...` `--move` `--overwrite` `--apply` | 把外部文件放进 `buffer/`（人→AI） |
 | `purge` | `--days N` `--hard` `--apply` | 清掉超期项（默认 2 天；默认软删进 `.trash/`） |
 | `discard` | `--item NAME...` `--reason` `--apply` | 把 buffer 项立即弃入暂存区（`.trash/` 或 `buffer/.replaced/`） |
+| **`tidy`** | `--apply` `--days` `--hard` | ★ **同一交付物只留最新一版**：同族旧版一把软删进 `.trash/`（保持 buffer 简洁） |
 
 根定位：`--root` → cwd 向上找 `.bigproject.json` → 回退到含 `projects/`+`README.md` 的目录。
 覆盖同名旧物**不硬删**：大项目根进 `.trash/`，否则进 `buffer/.replaced/`。
@@ -576,8 +578,21 @@ python scripts/oc_project_link.py fix --hub     # 只删 0 会话冗余行 + 清
 
 **③ 图表分辨率**：脚本产图用 **高 DPI（≥150–200）**（matplotlib 默认 100 偏低会糊）。
 
+**④ 外部服务并发纪律（2026-10-17 加 · 强制）**
+> 触发：长任务脚本会**批量调用某个外部服务**（LLM 端点 / 中转站 / 内网推理服务 / 抓取目标 …）。
+> 缘由（事故）：某 CAD 基准以 `MAD_CONC 3~8` 打**清华 MAD**（真实并发上限 ≈3）→ `RATE_LIMIT` → 位点被**中转站封禁** → **全体客户端一起 503 / 流式 `Decode error (200 POST)`**。
+> **"我脚本跑得欢"的代价是"所有人的服务一起挂"。**
+
+- **先问上限，再定并发**：调用前先查该服务**声明的并发/配额**（文档、`/v1/limits`、`/api/limits` 之类的端点）。
+  - 经 llm-proxy 的模型（`deepseek-flash`/`deepseek-exp`/`gpt`）：`python <skills>/llm-proxy/scripts/proxy.py limits`
+    → 看目标上游的 `max_concurrent`（如 `mad=3`、`modelbest=6`）；**并发度 ≤ max_concurrent**（`inflight ≥ max` 即"正忙"，应退避）。
+- **并发必须可调**：把并发度做成 CLI 参数（`--conc N`）+ **默认取保守值**；禁止硬编码一个"能跑满"的数。
+- **退避重试**：见到 `429` / `503` / `code=upstream_busy` / `RATE_LIMIT` → **指数退避**（带抖动），**不要**立刻重试、更不要提高并发。
+- **别绕过中间层**：走中转站的请求受**代理侧硬闸**保护；**直连上游**（自己拿 token 打内网服务）绕不过闸 → 这时**只能靠自己**压并发。
+- **共享/免费资源**：校内 / 内网 / 免费额度服务一律按"**共享**"对待，留余量（宁可慢，不要封）。
+
 **交付前检查清单**：□ 逐单元落盘？ □ 启动跳过已完成（幂等）？ □ 每单元实时进度（i/N、%、ETA）？
-□ flush / 无缓冲？ □ `stdout=JSON / stderr=进度` 分离？ □ 图 DPI ≥150？
+□ flush / 无缓冲？ □ `stdout=JSON / stderr=进度` 分离？ □ 图 DPI ≥150？ □ **并发度参数化且 ≤ 上游上限？** □ **429/503 有退避？**
 
 **最小模板（Python）**：
 ```python

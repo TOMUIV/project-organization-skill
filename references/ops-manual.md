@@ -106,6 +106,7 @@ python "$PO/trash.py" purge --older-than 30 --confirm         # 唯一硬删（�
 | **audit 报散落物** | 归入 `projects/`；确属合法根级扩展 → 写进 `.bigproject.json` 的 `root_extensions` |
 | **.trash 太大** | `trash.py status` 看压缩比 → `purge --older-than N --confirm`（确认后） |
 | **某个目录删不掉**（Windows 长路径 > 260） | 工具已内建「**先把顶层改名到短名 → 再删**」（`trash.py` 删除均走 `common.rmtree_robust`）；手工同理：把最外层目录改短名再 `rm` |
+| **buffer 里同一交付物堆了多版（v1/v2/v3…）** | `buffer.py tidy --apply` 一把收拢（只留最新一版）；`audit` 报 `buffer_version_pileup`。`deliver` 默认已自动取代旧版 |
 | **`.trash` 里有「孤儿包」/散落文件** | `trash.py list` 能看到（`orphan` / `kind=loose`）；`purge --legacy` 清无原路径的；`purge --id` 清单个 |
 
 ---

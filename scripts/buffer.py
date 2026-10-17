@@ -18,12 +18,14 @@
   take  --item F ...    把 buffer 项移动到目标目录（--subproject X --subdir data --apply）
   purge [--days N] [--hard]   清掉超期项
   discard --item F ...  立即把项弃入暂存区
+  tidy  [--apply]       ★ 同一交付物只留最新一版（同族旧版软删进 .trash/，保持 buffer 简洁）
 
 根定位：--root 显式；否则从 cwd 向上找 `.bigproject.json`，再回退到含 `projects/`+`README.md` 的目录。
 stdout: {"status":"ok", ...}
 """
 import argparse
 import os
+import re
 import shutil
 import sys
 import time
@@ -218,6 +220,56 @@ def cmd_take(args):
 
 
 # --------------------------------------------------------- deliver / add -----
+# ------------------------------------------- 版本归并（tidy / supersede）---
+VER_RE = re.compile(r"(?i)[_\-.\s]*v(\d+(?:[.\-]\d+)*)[_\-.\s]*$")
+FINAL_RE = re.compile(r"(?i)[_\-.\s]*(final|latest|new|终版|定稿)[_\-.\s]*$")
+
+
+def split_ver(name):
+    """名字 → (family, ver)。family =「去掉版本号的名字+扩展名」，ver 供比较新旧。"""
+    base, ext = os.path.splitext(name)
+    m = VER_RE.search(base)
+    if m:
+        ver = tuple(int(x) for x in re.split(r"[.\-]", m.group(1)))
+        return base[:m.start()].rstrip("_-. ") + ext, ver
+    m2 = FINAL_RE.search(base)
+    if m2:
+        return base[:m2.start()].rstrip("_-. ") + ext, (9999,)
+    return base + ext, (0,)
+
+
+def version_families(bdir):
+    """buffer 里「同一交付物多版本」的家族（只返回 >1 件的族）。"""
+    fam = {}
+    for p in sorted(Path(bdir).iterdir()):
+        if p.name in (".replaced", "README.md") or p.name.startswith("."):
+            continue
+        k, v = split_ver(p.name)
+        fam.setdefault(k, []).append((v, p.name))
+    return {k: sorted(v) for k, v in fam.items() if len(v) > 1}
+
+
+def _supersede(root, is_big, keep_name, bdir, dry_run):
+    """把与 keep_name 同族、但当次之外的旧版**软删进 .trash**（★ 保持 buffer 简洁）。"""
+    out = []
+    for _k, lst in version_families(bdir).items():
+        names = [n for _, n in lst]
+        if keep_name not in names:
+            continue
+        for _v, n in lst:
+            if n == keep_name:
+                continue
+            dest = None
+            if not dry_run:
+                dest = C.soft_remove(root, is_big, Path(bdir) / n,
+                                     reason="buffer supersede: 被 %s 取代" % keep_name)
+                C.project_log(root, is_big, "buffer.supersede", target=n,
+                              superseded_by=keep_name, trashed=str(dest))
+            out.append({"item": n, "superseded_by": keep_name,
+                        "trashed": str(dest) if dest else None})
+    return out
+
+
 def _put(args, root, is_big, dst_name=None):
     src = Path(args.file).expanduser()
     if not src.exists():
@@ -248,8 +300,14 @@ def cmd_deliver(args):
     if args.apply:
         C.project_log(root, is_big, "buffer.deliver", target=r["to"],
                       src=r["from"], mode=r["mode"])
+    superseded = []
+    if not getattr(args, "no_supersede", False):
+        # ★ 同一交付物只留最新一版：把同族旧版一并软删进 .trash（保持 buffer 简洁）
+        superseded = _supersede(root, is_big, Path(r["to"]).name,
+                                C.buffer_dir(root), not args.apply)
     C.emit({"status": "ok", "root": str(root), "dry_run": not args.apply,
-            "to": r["to"], "mode": r["mode"], "purged": purged})
+            "to": r["to"], "mode": r["mode"], "purged": purged,
+            "superseded": superseded})
 
 
 def cmd_add(args):
@@ -296,6 +354,30 @@ def cmd_discard(args):
     C.emit({"status": "ok", "root": str(root), "dry_run": dry_run, "discarded": discarded})
 
 
+# -------------------------------------------------------------------- tidy ---
+def cmd_tidy(args):
+    """★ 同一交付物只留最新一版：同族旧版一并软删进 .trash（保持 buffer 简洁）。"""
+    root, is_big = require_root(args.root)
+    purged = auto_purge(root, is_big, args.days, args.hard, enabled=not args.no_purge)
+    bdir = C.buffer_dir(root)
+    dry_run = not args.apply
+    plan, done = [], []
+    for _k, lst in version_families(bdir).items():
+        keep = lst[-1][1]                     # 版本号最大者留下
+        for _v, n in lst[:-1]:
+            rec = {"item": n, "superseded_by": keep}
+            plan.append(rec)
+            if not dry_run:
+                dest = C.soft_remove(root, is_big, bdir / n,
+                                     reason="buffer tidy: 被 %s 取代" % keep)
+                C.project_log(root, is_big, "buffer.tidy", target=n,
+                              superseded_by=keep, trashed=str(dest))
+                done.append({**rec, "trashed": str(dest)})
+    C.emit({"status": "ok", "root": str(root), "dry_run": dry_run,
+            "purged": purged, "would_supersede": plan,
+            "superseded": done, "count": len(plan)})
+
+
 # -------------------------------------------------------------------- main ---
 def _ttl_opts(p, default_days=TTL_DAYS):
     p.add_argument("--days", type=int, default=default_days,
@@ -333,6 +415,8 @@ def main():
     p.add_argument("--root"); p.add_argument("--file", required=True)
     p.add_argument("--name"); p.add_argument("--move", action="store_true")
     p.add_argument("--overwrite", action="store_true")
+    p.add_argument("--no-supersede", action="store_true",
+                   help="不把同族旧版移入暂存（默认会——保持 buffer 只留最新一版）")
     p.add_argument("--apply", action="store_true")
     _ttl_opts(p)
     p.set_defaults(func=cmd_deliver)
@@ -353,6 +437,12 @@ def main():
     p.add_argument("--root"); p.add_argument("--item", nargs="+", required=True)
     p.add_argument("--reason"); p.add_argument("--apply", action="store_true")
     p.set_defaults(func=cmd_discard)
+
+    p = sub.add_parser("tidy", help="★ 同一交付物只留最新一版（旧版软删进 .trash/）")
+    p.add_argument("--root"); p.add_argument("--apply", action="store_true",
+                                             help="真正执行（默认只预演）")
+    _ttl_opts(p)
+    p.set_defaults(func=cmd_tidy)
 
     args = ap.parse_args()
     try:

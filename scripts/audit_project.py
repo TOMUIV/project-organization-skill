@@ -14,6 +14,7 @@ stdout: {"status":"ok","root":...,"summary":{...},"issues":[...]}
 """
 import argparse
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -105,6 +106,21 @@ def audit(root):
                     "缓冲区 %d 项在 projects/shared/archive 无同名归宿（buffer 不应存唯一副本，"
                     "应先归位或清理）：%s"
                     % (len(orphans), ", ".join(c.name for c in orphans[:6])))
+
+            # ★ 同一交付物多版本堆积（buffer 只应留最新一版）
+            _VER = re.compile(r"(?i)[_\-.\s]*v(\d+(?:[.\-]\d+)*)[_\-.\s]*$")
+            fam = {}
+            for c in items:
+                base, ext = os.path.splitext(c.name)
+                m = _VER.search(base)
+                key = (base[:m.start()].rstrip("_-. ") + ext) if m else c.name
+                fam.setdefault(key, []).append(c.name)
+            pile = {k: v for k, v in fam.items() if len(v) > 1}
+            if pile:
+                add("low", "buffer_version_pileup", bdir,
+                    "缓冲区 %d 个交付物堆了多版本（应只留最新一版；跑 buffer.py tidy --apply）：%s"
+                    % (len(pile), "; ".join("%s ← %s" % (k, ", ".join(sorted(v)))
+                                            for k, v in list(pile.items())[:3])))
 
     # 顶层散落物（默认允许集 + 项目在 .bigproject.json 中声明的有意扩展）
     ext_files, ext_dirs = C.root_allow_extensions(root)

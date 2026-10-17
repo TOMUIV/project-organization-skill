@@ -81,24 +81,48 @@ def audit(root):
                 add("info", "buffer_pending", bdir,
                     "缓冲区有 %d 项未处理（交付优先放这里；超 2 天会自动清理）" % len(items))
 
-            # ★ 一一对应：buffer 每一项都应在 projects/ shared/ archive/ 有归宿
-            #   （buffer 只做中转，禁止当唯一副本 / 长期存放）
-            known, cap = set(), 200000
+            # ★ 一一对应：buffer 每一项都应在 projects/ shared/ archive/ 有归宿。
+            #   判定 = **同名** 或 **内容一致**（同 ext+size 且 md5 相同 → 允许改名）。
+            known, by_size, cap = set(), {}, 300000
             for d in (C.PROJECTS_DIR, C.SHARED_DIR, C.ARCHIVE_DIR):
                 dp = root / d
                 if not dp.is_dir():
                     continue
                 for _a, dns, fns in os.walk(dp):
                     known.update(dns)
-                    known.update(fns)
+                    for f in fns:
+                        known.add(f)
+                        fp = os.path.join(_a, f)
+                        try:
+                            st = os.stat(fp)
+                        except OSError:
+                            continue
+                        by_size.setdefault((os.path.splitext(f)[1].lower(), st.st_size), []).append(fp)
                     if len(known) > cap:
                         break
 
+            import hashlib
+
+            def _md5(p):
+                h = hashlib.md5()
+                with open(p, "rb") as fh:
+                    for chunk in iter(lambda: fh.read(1 << 20), b""):
+                        h.update(chunk)
+                return h.hexdigest()
+
             def _has_home(it):
-                if it.is_file():
-                    return it.name in known
-                inner = [q for q in it.rglob("*") if q.is_file()]
-                return (not inner) or all(q.name in known for q in inner)
+                inner = [it] if it.is_file() else [q for q in it.rglob("*") if q.is_file()]
+                for q in inner:
+                    if q.name in known:                       # 同名 → 有归宿
+                        continue
+                    try:                                      # 改名但内容一致 → 也算有归宿
+                        st = q.stat()
+                        cands = by_size.get((q.suffix.lower(), st.st_size), [])
+                        if not cands or _md5(q) not in {_md5(Path(c)) for c in cands}:
+                            return False
+                    except OSError:
+                        return False
+                return True
 
             orphans = [c for c in items if not _has_home(c)]
             if orphans:

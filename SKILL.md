@@ -10,7 +10,7 @@ description: >
   读取 buffer、处理 buffer、缓冲区、把文件丢进 buffer、buffer 归位。
   Use ONLY for long-lived / multi-phase projects；一次性临时任务走 `temp-workspace`，不要用本 skill。
   所有大项目根**必须配备 git**（`scripts/git_setup.py`；改动前先 commit）。
-version: 2.6.1
+version: 2.6.2
 ---
 
 # Project Organization — 大项目组织方法论
@@ -211,7 +211,7 @@ projects/<项目>/
 
 **规则（就 5 条）**
 - ★★ **TTL 2 天 = 强制清理**：进入 buffer（任何子命令）**先自动检查**，**超期一律清掉**（软删进 `.trash/`，可恢复；`--hard` 真删，`--no-purge` 跳过）；`audit` 报 `buffer_expired`。**buffer 只做中转，不是存储区。**
-- ★★ **一一对应**：**buffer 里的每一项都必须在 `projects/`（或 `shared/`/`archive/`）有归宿**——要么等 `take` 归位，要么是项目 `output/` 的**交付副本**（`deliver` **默认 copy → 项目保留原件**）；**禁止把 buffer 当唯一副本 / 长期存放**。
+- ★★ **一一对应**（判定 = **同名或内容一致**，允许改名）：**buffer 里的每一项都必须在 `projects/`（或 `shared/`/`archive/`）有归宿**——要么等 `take` 归位，要么是项目 `output/` 的**交付副本**（`deliver` **默认 copy → 项目保留原件**）；**禁止把 buffer 当唯一副本 / 长期存放**。
 - **先预演后执行**（`--apply`）；覆盖同名旧物**进暂存**（`.trash/` 或 `buffer/.replaced/`），**不硬删**。
 - ★★ **只留最新一版（禁版本堆积）**：**同一交付物的新一轮交付 = 取代旧版**——`deliver` **默认自动**把同族旧版（如 `x_v3.png` 之于 `x_v5.png`）**软删进 `.trash/`**（`--no-supersede` 可关）；**禁止 `v1/v2/v3…` 堆在 buffer**。存量用 `buffer.py tidy --apply` 一把收拢；`audit` 报 `buffer_version_pileup`。
 - ⭐ **任务文件归位**（AGENTS 规则 8）：用户丢来的输入 + 本任务的中间/结果件，**收尾必须归进对应子项目**；同名不覆盖（`name.1.ext`）；**`take` 归位后才算完**。

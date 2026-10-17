@@ -10,7 +10,7 @@ description: >
   读取 buffer、处理 buffer、缓冲区、把文件丢进 buffer、buffer 归位。
   Use ONLY for long-lived / multi-phase projects；一次性临时任务走 `temp-workspace`，不要用本 skill。
   所有大项目根**必须配备 git**（`scripts/git_setup.py`；改动前先 commit）。
-version: 2.6.0
+version: 2.6.1
 ---
 
 # Project Organization — 大项目组织方法论
@@ -494,6 +494,13 @@ shared/
 ## 十三、版本控制（git，强制 · 2026-10-10）
 
 > **规则**：所有 `project-organization` 大项目根**必须**是 git 仓库；**动文件之前先 commit**。
+
+### ⚠️ 别在 OpenCode 已登记后「重写历史」（2026-10-17 实测）
+OpenCode 按 **(worktree, vcs, 登记时的 commit)** 记 project 行。当目录**变成 git 仓**（`git init`）或**重写历史**（`amend` / `rebase` / 重建库，HEAD sha 变了）时，会**再生一条新行**，老会话留在旧行 → 该文件夹 session 列表看似"空 / 不全"（**会话没丢**）。
+- ⇒ `git init` 应在 OpenCode **第一次打开该目录之前**完成（顺序铁律）；
+- ⇒ **已登记之后，别为了"清历史"反复 `amend` / 重建库**（会多条）；确实要重写时，重写完跑 `oc_project_link.py status` 复查，多出来的 **0 会话行**用 `fix` 清掉。
+- 实测佐证：`project.id` **直接等于登记时的 commit sha**（如 `d123897b4beee693f97bb30474209311da56d032`）。
+- 修复流程：`status` → `fix`（只删 **0 会话**行，自动导出 JSON 存底）→ **重启 OpenCode 服务** → `status` 复查。
 
 ### 为什么（事故背景）
 某项目里用户**手工改了 SVG**，随后被「重跑生成器」**覆盖**；而该目录**没有 git**、
